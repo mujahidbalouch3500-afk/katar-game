@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Katar - Online Game</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #eee; min-height: 100vh; }
+
+  /* ── Pages ── */
+  .page { display: none; min-height: 100vh; }
+  .page.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  /* ── Auth Page ── */
+  .auth-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 16px; padding: 2rem; width: 340px; }
+  .auth-box h1 { text-align: center; font-size: 2rem; color: #7c6af7; margin-bottom: 0.3rem; }
+  .auth-box p.sub { text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 1.5rem; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+  .tab-btn { flex: 1; padding: 8px; border: 1px solid #2a2a4a; background: transparent; color: #aaa; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+  .tab-btn.active { background: #7c6af7; color: white; border-color: #7c6af7; }
+  .input-group { margin-bottom: 1rem; }
+  .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+  .input-group input { width: 100%; padding: 10px 14px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 8px; color: #eee; font-size: 14px; outline: none; transition: border 0.2s; }
+  .input-group input:focus { border-color: #7c6af7; }
+  .btn-main { width: 100%; padding: 11px; background: #7c6af7; border: none; border-radius: 8px; color: white; font-size: 15px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+  .btn-main:hover { background: #6a58e0; }
+  .err-msg { color: #e24b4a; font-size: 13px; text-align: center; margin-top: 10px; min-height: 18px; }
+
+  /* ── Lobby Page ── */
+  .lobby-wrap { width: 360px; }
+  .lobby-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+  .lobby-header h2 { color: #7c6af7; font-size: 1.4rem; }
+  .user-chip { display: flex; align-items: center; gap: 8px; background: #1a1a2e; padding: 6px 14px; border-radius: 99px; font-size: 13px; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: #7c6af7; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  .btn-outline { padding: 8px 16px; border: 1px solid #2a2a4a; background: transparent; color: #aaa; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .btn-outline:hover { border-color: #7c6af7; color: #7c6af7; }
+  .lobby-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; text-align: center; }
+  .lobby-card h3 { margin-bottom: 0.5rem; font-size: 1rem; }
+  .lobby-card p { color: #888; font-size: 13px; margin-bottom: 1rem; }
+  .btn-play { padding: 12px 32px; background: #7c6af7; border: none; border-radius: 10px; color: white; font-size: 16px; cursor: pointer; font-weight: 700; transition: all 0.2s; }
+  .btn-play:hover { background: #6a58e0; transform: scale(1.03); }
+  .btn-play:disabled { background: #444; cursor: not-allowed; transform: none; }
+  .waiting-indicator { display: flex; align-items: center; gap: 10px; justify-content: center; color: #7c6af7; font-size: 14px; }
+  .spinner { width: 18px; height: 18px; border: 2px solid #7c6af7; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Game Page ── */
+  .game-wrap { width: 100%; max-width: 480px; padding: 1rem; }
+  .game-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .player-info { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .player-name { font-size: 13px; font-weight: 600; }
+  .goti-count { font-size: 11px; color: #888; }
+  .player-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot-red { background: #e24b4a; }
+  .dot-green { background: #1d9e75; }
+  .active-player { padding: 4px 10px; background: #1a1a2e; border-radius: 6px; font-size: 11px; color: #7c6af7; border: 1px solid #7c6af7; }
+  .vs-badge { font-size: 12px; color: #666; font-weight: 700; }
+  .status-bar { text-align: center; padding: 8px; background: #1a1a2e; border-radius: 8px; font-size: 13px; color: #ccc; margin-bottom: 1rem; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+  #board-svg { display: block; margin: 0 auto; }
+  .btn-leave { display: block; margin: 1rem auto 0; padding: 8px 20px; border: 1px solid #444; background: transparent; color: #888; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .btn-leave:hover { border-color: #e24b4a; color: #e24b4a; }
+
+  /* ── Admin Page ── */
+  .admin-wrap { width: 100%; max-width: 700px; padding: 1rem; }
+  .admin-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0 1.5rem; }
+  .admin-header h2 { color: #7c6af7; font-size: 1.3rem; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 1rem; text-align: center; }
+  .stat-card .num { font-size: 1.8rem; font-weight: 700; color: #7c6af7; }
+  .stat-card .label { font-size: 11px; color: #888; margin-top: 2px; }
+  .admin-tabs { display: flex; gap: 8px; margin-bottom: 1rem; }
+  .admin-tab { padding: 8px 20px; border: 1px solid #2a2a4a; background: transparent; color: #aaa; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .admin-tab.active { background: #7c6af7; color: white; border-color: #7c6af7; }
+  .admin-section { display: none; }
+  .admin-section.active { display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; color: #888; font-weight: 500; border-bottom: 1px solid #2a2a4a; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1a1a2e; color: #ccc; }
+  tr:hover td { background: #1a1a2e; }
+  .badge { padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #0f3d28; color: #1d9e75; }
+  .badge-red { background: #3d0f0f; color: #e24b4a; }
+  .badge-yellow { background: #3d2f0f; color: #f0a500; }
+  .btn-del { padding: 4px 12px; border: 1px solid #444; background: transparent; color: #e24b4a; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .btn-del:hover { background: #3d0f0f; }
+  .empty-msg { text-align: center; color: #555; padding: 2rem; font-size: 13px; }
+
+  /* ── Overlay ── */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .overlay.show { display: flex; }
+  .overlay-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 16px; padding: 2rem; text-align: center; width: 300px; }
+  .overlay-box h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+  .overlay-box p { color: #888; font-size: 14px; margin-bottom: 1.5rem; }
+  .overlay-box .btn-main { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<!-- Auth Page -->
+<div id="page-auth" class="page active">
+  <div class="auth-box">
+    <h1>کتار</h1>
+    <p class="sub">Online 9 Goti Game</p>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('login')">Login</button>
+      <button class="tab-btn" onclick="showTab('register')">Register</button>
+    </div>
+    <div id="tab-login">
+      <div class="input-group"><label>Username</label><input type="text" id="login-user" placeholder="apna username likhein"></div>
+      <div class="input-group"><label>Password</label><input type="password" id="login-pass" placeholder="password"></div>
+      <button class="btn-main" onclick="doLogin()">Login Karein</button>
+    </div>
+    <div id="tab-register" style="display:none">
+      <div class="input-group"><label>Username</label><input type="text" id="reg-user" placeholder="naya username chunein"></div>
+      <div class="input-group"><label>Password</label><input type="password" id="reg-pass" placeholder="password (4+ harf)"></div>
+      <button class="btn-main" onclick="doRegister()">Account Banao</button>
+    </div>
+    <div class="err-msg" id="auth-err"></div>
+  </div>
+</div>
+
+<!-- Lobby Page -->
+<div id="page-lobby" class="page">
+  <div class="lobby-wrap">
+    <div class="lobby-header">
+      <h2>کتار</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="user-chip"><div class="avatar" id="lobby-avatar">?</div><span id="lobby-username">-</span></div>
+        <button class="btn-outline" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+    <div class="lobby-card">
+      <h3>Online Match Khelo</h3>
+      <p>Doosre khiladi ka intezaar karein — match milne par game shuru ho jaegi</p>
+      <div id="lobby-status">
+        <button class="btn-play" id="find-btn" onclick="findGame()">Game Dhoondo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Game Page -->
+<div id="page-game" class="page">
+  <div class="game-wrap">
+    <div class="game-header">
+      <div class="player-info">
+        <div class="player-dot dot-red"></div>
+        <div class="player-name" id="g-p1name">-</div>
+        <div class="goti-count" id="g-p1hand">9 gotiyan</div>
+      </div>
+      <div style="text-align:center">
+        <div class="vs-badge">VS</div>
+        <div class="active-player" id="g-turn">-</div>
+      </div>
+      <div class="player-info">
+        <div class="player-dot dot-green"></div>
+        <div class="player-name" id="g-p2name">-</div>
+        <div class="goti-count" id="g-p2hand">9 gotiyan</div>
+      </div>
+    </div>
+    <div class="status-bar" id="g-status">Intezaar karein...</div>
+    <svg id="board-svg" viewBox="0 0 400 400" width="360" height="360">
+      <rect width="400" height="400" fill="transparent"/>
+      <g stroke="#2a2a4a" stroke-width="1.5" fill="none">
+        <rect x="30" y="30" width="340" height="340"/>
+        <rect x="100" y="100" width="200" height="200"/>
+        <rect x="170" y="170" width="60" height="60"/>
+        <line x1="200" y1="30" x2="200" y2="100"/>
+        <line x1="200" y1="230" x2="200" y2="300"/>
+        <line x1="30" y1="200" x2="100" y2="200"/>
+        <line x1="300" y1="200" x2="370" y2="200"/>
+        <line x1="200" y1="300" x2="200" y2="370"/>
+        <line x1="100" y1="200" x2="170" y2="200"/>
+        <line x1="230" y1="200" x2="300" y2="200"/>
+      </g>
+      <g id="points-g"></g>
+    </svg>
+    <button class="btn-leave" onclick="leaveGame()">Game Choro</button>
+  </div>
+</div>
+
+<!-- Admin Page -->
+<div id="page-admin" class="page">
+  <div class="admin-wrap">
+    <div class="admin-header">
+      <h2>Admin Dashboard</h2>
+      <button class="btn-outline" onclick="doLogout()">Logout</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="num" id="stat-players">0</div><div class="label">Kul Players</div></div>
+      <div class="stat-card"><div class="num" id="stat-games">0</div><div class="label">Kul Games</div></div>
+      <div class="stat-card"><div class="num" id="stat-active">0</div><div class="label">Active Games</div></div>
+      <div class="stat-card"><div class="num" id="stat-done">0</div><div class="label">Mukammal Games</div></div>
+    </div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="adminTab('players')">Players</button>
+      <button class="admin-tab" onclick="adminTab('games')">Games History</button>
+    </div>
+    <div id="admin-players" class="admin-section active">
+      <table><thead><tr><th>#</th><th>Username</th><th>Join Date</th><th>Action</th></tr></thead>
+      <tbody id="players-tbody"></tbody></table>
+    </div>
+    <div id="admin-games" class="admin-section">
+      <table><thead><tr><th>#</th><th>Player 1</th><th>Player 2</th><th>Winner</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody id="games-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- Result Overlay -->
+<div class="overlay" id="result-overlay">
+  <div class="overlay-box">
+    <h2 id="result-title">Game Khatam!</h2>
+    <p id="result-msg">-</p>
+    <button class="btn-main" onclick="closeResult()">Lobby Waapis</button>
+  </div>
+</div>
+
+<script>
+const POINTS_COORDS = [
+  [30,30],[200,30],[370,30],
+  [100,100],[200,100],[300,100],
+  [170,170],[200,170],[230,170],
+  [30,200],[100,200],[170,200],[230,200],[300,200],[370,200],
+  [170,230],[200,230],[230,230],
+  [100,300],[200,300],[300,300],
+  [30,370],[200,370],[370,370]
+];
+
+let token = localStorage.getItem('katar_token');
+let username = localStorage.getItem('katar_username');
+let role = localStorage.getItem('katar_role');
+let socket = null;
+let gameState = null;
+let myIndex = -1;
+let selected = -1;
+
+// ── Pages ─────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.getElementById('tab-login').style.display = tab==='login'?'block':'none';
+  document.getElementById('tab-register').style.display = tab==='register'?'block':'none';
+}
+
+// ── Auth ──────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if(!u||!p) return setErr('Sab fields bharo');
+  try {
+    const r = await fetch('/api/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) });
+    const d = await r.json();
+    if(!r.ok) return setErr(d.error);
+    saveAuth(d.token, d.username, d.role||'player');
+    afterLogin();
+  } catch { setErr('Server se connection nahi hua'); }
+}
+
+async function doRegister() {
+  const u = document.getElementById('reg-user').value.trim();
+  const p = document.getElementById('reg-pass').value;
+  if(!u||!p) return setErr('Sab fields bharo');
+  try {
+    const r = await fetch('/api/register', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({username:u,password:p}) });
+    const d = await r.json();
+    if(!r.ok) return setErr(d.error);
+    saveAuth(d.token, d.username, 'player');
+    afterLogin();
+  } catch { setErr('Server se connection nahi hua'); }
+}
+
+function saveAuth(t, u, r) {
+  token=t; username=u; role=r;
+  localStorage.setItem('katar_token',t);
+  localStorage.setItem('katar_username',u);
+  localStorage.setItem('katar_role',r);
+}
+
+function setErr(msg) { document.getElementById('auth-err').textContent = msg; }
+
+function afterLogin() {
+  if(role==='admin') { showPage('admin'); loadAdminData(); }
+  else { showLobby(); connectSocket(); }
+}
+
+function doLogout() {
+  localStorage.clear();
+  if(socket) { socket.disconnect(); socket=null; }
+  token=null; username=null; role=null;
+  showPage('auth');
+}
+
+// ── Lobby ─────────────────────────────────────────────────
+function showLobby() {
+  showPage('lobby');
+  document.getElementById('lobby-username').textContent = username;
+  document.getElementById('lobby-avatar').textContent = username[0].toUpperCase();
+  document.getElementById('lobby-status').innerHTML = '<button class="btn-play" id="find-btn" onclick="findGame()">Game Dhoondo</button>';
+}
+
+function connectSocket() {
+  if(socket && socket.connected) return;
+  socket = io({ auth: { token } });
+  socket.on('waiting', () => {
+    document.getElementById('lobby-status').innerHTML = `<div class="waiting-indicator"><div class="spinner"></div>Doosre khiladi ka intezaar...</div><br><button class="btn-outline" onclick="cancelFind()" style="margin-top:8px">Cancel</button>`;
+  });
+  socket.on('state', (s) => {
+    gameState = s;
+    if(gameState && !gameState.over) showPage('game');
+    renderGame();
+  });
+  socket.on('opponent_left', () => {
+    showResult('Aap Jeet Gaye!', 'Dushman game chor gaya');
+  });
+  socket.on('cancelled', () => { showLobby(); });
+  socket.on('connect_error', (e) => { console.log('Socket error', e.message); });
+}
+
+function findGame() {
+  if(!socket) connectSocket();
+  socket.emit('find_game');
+}
+
+function cancelFind() {
+  if(socket) socket.emit('cancel_find');
+}
+
+// ── Game ─────────────────────────────────────────────────
+function renderGame() {
+  if(!gameState) return;
+  const s = gameState;
+  myIndex = s.players.indexOf(username);
+
+  document.getElementById('g-p1name').textContent = s.players[0]||'-';
+  document.getElementById('g-p2name').textContent = s.players[1]||'-';
+  document.getElementById('g-p1hand').textContent = `Haath: ${s.hand[0]} | Board: ${s.board.filter(v=>v===1).length}`;
+  document.getElementById('g-p2hand').textContent = `Haath: ${s.hand[1]} | Board: ${s.board.filter(v=>v===2).length}`;
+  document.getElementById('g-turn').textContent = s.over ? 'Game Khatam' : `${s.players[s.current]} ki baari`;
+
+  if(s.over) {
+    const won = s.winner === username;
+    showResult(won ? '🎉 Aap Jeet Gaye!' : '😔 Aap Haar Gaye', `${s.winner} ne yeh game jeeti`);
+  }
+
+  let statusMsg = '';
+  if(myIndex === s.current && !s.over) {
+    if(s.mustRemove) statusMsg = 'Mill! Dushman ki goti uthao';
+    else if(s.phase[myIndex]===1) statusMsg = 'Apni goti rakho (click karein)';
+    else statusMsg = selected>=0 ? 'Ab jagah chunno' : 'Apni goti chunno';
+  } else if(!s.over) {
+    statusMsg = `${s.players[s.current]} ki baari hai...`;
+  }
+  document.getElementById('g-status').textContent = statusMsg;
+
+  const g = document.getElementById('points-g');
+  g.innerHTML = '';
+  POINTS_COORDS.forEach(([x,y], i) => {
+    const isMyPiece = s.board[i] === myIndex+1;
+    const isOppPiece = s.board[i] === (myIndex===0?2:1);
+    const isSelected = selected === i;
+    const isMine = myIndex === s.current && !s.over;
+
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',x); circle.setAttribute('cy',y); circle.setAttribute('r',14);
+    circle.setAttribute('stroke', isSelected ? '#7c6af7' : '#2a2a4a');
+    circle.setAttribute('stroke-width', isSelected ? '3' : '1.5');
+
+    let fill = '#0f0f1a';
+    if(s.board[i]===1) fill = '#e24b4a';
+    else if(s.board[i]===2) fill = '#1d9e75';
+
+    if(s.mustRemove && isOppPiece && isMine) {
+      circle.setAttribute('stroke','#e24b4a'); circle.setAttribute('stroke-width','2.5');
+    }
+    if(s.board[i]===0 && selected>=0 && isMine && !s.mustRemove) {
+      const ADJACENT = {0:[1,9],1:[0,2,4],2:[1,13],3:[4,10],4:[1,3,5,7],5:[4,13],6:[7,11],7:[4,6,8],8:[7,12],9:[0,10,21],10:[3,9,11,18],11:[6,10,15],12:[8,13,16],13:[2,5,12,14,23],14:[13,19],15:[11,16],16:[12,15,17],17:[16,19],18:[10,19],19:[14,17,18,22],20:[19,23],21:[9,22],22:[19,21,23],23:[2,13,20,22]};
+      const ph = s.phase[myIndex];
+      if(ph===3 || ADJACENT[selected].includes(i)) {
+        circle.setAttribute('stroke','#7c6af7'); circle.setAttribute('stroke-width','2');
+        fill = '#1a1a2e';
+      }
+    }
+
+    circle.setAttribute('fill', fill);
+    circle.setAttribute('cursor', 'pointer');
+    circle.addEventListener('click', ()=>handleMove(i));
+    g.appendChild(circle);
+  });
+}
+
+function handleMove(i) {
+  if(!gameState || gameState.over) return;
+  const s = gameState;
+  const myI = myIndex;
+  if(myI !== s.current) return;
+
+  if(s.mustRemove) {
+    socket.emit('move', { type:'remove', to:i });
+    return;
+  }
+  if(s.phase[myI]===1) {
+    socket.emit('move', { type:'place', to:i });
+    return;
+  }
+  if(selected===-1) {
+    if(s.board[i]===myI+1) { selected=i; renderGame(); }
+  } else {
+    if(i===selected) { selected=-1; renderGame(); return; }
+    if(s.board[i]===myI+1) { selected=i; renderGame(); return; }
+    socket.emit('move', { type:'move', from:selected, to:i });
+    selected=-1;
+  }
+}
+
+function showResult(title, msg) {
+  document.getElementById('result-title').textContent = title;
+  document.getElementById('result-msg').textContent = msg;
+  document.getElementById('result-overlay').classList.add('show');
+}
+
+function closeResult() {
+  document.getElementById('result-overlay').classList.remove('show');
+  gameState=null; selected=-1;
+  showLobby();
+}
+
+function leaveGame() {
+  if(confirm('Kya aap sach mein game chorna chahte hain?')) {
+    gameState=null; selected=-1;
+    showLobby();
+  }
+}
+
+// ── Admin ─────────────────────────────────────────────────
+function adminTab(tab) {
+  document.querySelectorAll('.admin-tab').forEach((b,i)=>b.classList.toggle('active',(i===0&&tab==='players')||(i===1&&tab==='games')));
+  document.querySelectorAll('.admin-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('admin-'+tab).classList.add('active');
+}
+
+async function loadAdminData() {
+  const h = { 'Authorization':'Bearer '+token };
+  try {
+    const [statsR, playersR, gamesR] = await Promise.all([
+      fetch('/api/admin/stats',{headers:h}),
+      fetch('/api/admin/players',{headers:h}),
+      fetch('/api/admin/games',{headers:h})
+    ]);
+    const stats = await statsR.json();
+    const players = await playersR.json();
+    const games = await gamesR.json();
+
+    document.getElementById('stat-players').textContent = stats.totalPlayers;
+    document.getElementById('stat-games').textContent = stats.totalGames;
+    document.getElementById('stat-active').textContent = stats.activeGames;
+    document.getElementById('stat-done').textContent = stats.completedGames;
+
+    const pb = document.getElementById('players-tbody');
+    pb.innerHTML = players.length ? players.map((p,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${p.username}</strong></td>
+        <td>${new Date(p.created_at).toLocaleDateString('ur-PK')}</td>
+        <td><button class="btn-del" onclick="deletePlayer(${p.id})">Hatao</button></td>
+      </tr>`).join('') : '<tr><td colspan="4" class="empty-msg">Koi player nahi mila</td></tr>';
+
+    const gb = document.getElementById('games-tbody');
+    gb.innerHTML = games.length ? games.map((g,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td>${g.player1}</td>
+        <td>${g.player2||'<span style="color:#555">Intezaar</span>'}</td>
+        <td>${g.winner||'<span style="color:#555">-</span>'}</td>
+        <td><span class="badge ${g.status==='finished'?'badge-green':g.status==='playing'?'badge-yellow':'badge-red'}">${g.status}</span></td>
+        <td>${new Date(g.started_at).toLocaleDateString()}</td>
+      </tr>`).join('') : '<tr><td colspan="6" class="empty-msg">Koi game nahi mili</td></tr>';
+  } catch(e) { console.error(e); }
+}
+
+async function deletePlayer(id) {
+  if(!confirm('Kya aap is player ko delete karna chahte hain?')) return;
+  await fetch('/api/admin/players/'+id, { method:'DELETE', headers:{'Authorization':'Bearer '+token} });
+  loadAdminData();
+}
+
+// ── Init ─────────────────────────────────────────────────
+if(token && username) {
+  if(role==='admin') { showPage('admin'); loadAdminData(); }
+  else { showLobby(); connectSocket(); }
+}
+</script>
+</body>
+</html>
